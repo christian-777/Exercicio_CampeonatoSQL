@@ -12,6 +12,7 @@ create table TimeFutebol(
     GolsContra int, 
     GolsPro int, 
     Pontuacao int,
+    Vitoria int,
 
     CONSTRAINT PK_TimeFutebol PRIMARY KEY (Id),
     CONSTRAINT UN_TimeFutebol UNIQUE (Nome)
@@ -37,7 +38,7 @@ GO
 create or alter PROCEDURE InsereTime @Nome VARCHAR(50), @dataCriacao DATETIME
 AS
 BEGIN
-    INSERT into TimeFutebol (Nome, DataCriacao, GolsContra, GolsPro, Pontuacao) VALUES (@Nome, @dataCriacao, 0, 0, 0)
+    INSERT into TimeFutebol (Nome, DataCriacao, GolsContra, GolsPro, Pontuacao, Vitoria) VALUES (@Nome, @dataCriacao, 0, 0, 0, 0)
 end
 GO
 
@@ -72,6 +73,11 @@ BEGIN
 
     update Jogo set TotalGols=(@golsMandante + @golsVisitante) where Mandante=@Mandante and Visitante=@Visitante
 
+    If(@golsMandante>@golsVisitante)
+        UPDATE TimeFutebol set Vitoria+=1 WHERE Id=@Mandante
+    If(@golsMandante<@golsVisitante)
+        UPDATE TimeFutebol set Vitoria+=1 WHERE Id=@Visitante
+
     UPDATE TimeFutebol set GolsPro+=@golsMandante, GolsContra+=@golsVisitante, 
     Pontuacao+= case 
                     when(@golsMandante=@golsVisitante) then 1
@@ -94,10 +100,24 @@ GO
 create or alter PROCEDURE MostrarGanhador
 AS
 BEGIN
-    DECLARE @ponts int
-    SELECT top 1 @ponts=pontuacao from TimeFutebol ORDER by Pontuacao DESC
+    DECLARE @ponts int, @id int, @aux int, @vitoria int
 
-    SELECT top 1 nome, pontuacao from TimeFutebol where pontuacao=@ponts order by (GolsPro-GolsContra) desc
+    SELECT top 1 @ponts=pontuacao , @id=id from TimeFutebol ORDER by Pontuacao DESC
+
+    SELECT @aux=id from TimeFutebol where pontuacao=@ponts
+
+    if(@id!=@aux)
+    BEGIN
+        SELECT top 1 @vitoria=Vitoria , @id=id from TimeFutebol ORDER by Pontuacao DESC
+        SELECT @aux=id from TimeFutebol where Vitoria=@vitoria
+
+        if(@id!=@aux)
+            SELECT top 1 nome, pontuacao from TimeFutebol where pontuacao=@ponts order by (GolsPro-GolsContra) desc
+        else
+            SELECT top 1 nome, pontuacao from TimeFutebol where pontuacao=@ponts order by Vitoria desc
+    END
+    else
+        SELECT top 1 nome, pontuacao from TimeFutebol ORDER by Pontuacao DESC
 END
 GO
 
@@ -105,7 +125,7 @@ GO
 create or alter PROCEDURE MostrarRank
 AS
 BEGIN
-    SELECT nome, pontuacao, (GolsPro-GolsContra) as saldoGol from TimeFutebol order by pontuacao desc, saldoGol desc
+    SELECT nome, pontuacao, (GolsPro-GolsContra) as saldoGol, Vitoria from TimeFutebol order by pontuacao desc, saldoGol desc, vitoria desc
 END
 GO
 
